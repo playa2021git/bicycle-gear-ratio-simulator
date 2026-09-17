@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自転車ギヤ比シミュレータ</title>
+<style>
+  :root{
+    --bg:#eef2f6; --panel:#ffffff; --ink:#1b2430; --sub:#5a6a7a; --line:#d3dde6;
+    --left:#1668c8; --left-bg:#e8f1fc;
+    --right:#e07000; --right-bg:#fdf0e2;
+    --ok:#178a4c; --warn:#d98200; --bad:#c62828;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.4;
+  }
+  .wrap{max-width:1500px;margin:0 auto;padding:7px 10px 14px;}
+
+  /* ===== ヘッダー ===== */
+  header{
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:6px 12px;margin-bottom:7px;
+  }
+  header h1{font-size:17px;margin:0 8px 0 0;white-space:nowrap;}
+  header h1 span{font-size:12px;color:var(--sub);font-weight:normal;margin-left:6px;}
+  .spacer{flex:1;}
+  .modeSel{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .modeSel button{
+    border:0;background:#fff;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--sub);
+    font-family:inherit;
+  }
+  .modeSel button.on{background:var(--ink);color:#fff;font-weight:bold;}
+  .timer{font-variant-numeric:tabular-nums;font-size:20px;font-weight:bold;min-width:82px;text-align:center;}
+  .timer.hidden{visibility:hidden;}
+  .btn{
+    font-family:inherit;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid var(--line);
+    background:#fff;cursor:pointer;color:var(--ink);
+  }
+  .btn:hover{background:#f3f7fb;}
+  .btn.primary{background:var(--ok);border-color:var(--ok);color:#fff;font-weight:bold;min-width:112px;}
+  .btn.primary.stop{background:var(--bad);border-color:var(--bad);}
+  .chk{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:4px;cursor:pointer;}
+
+  /* ===== プリセット ===== */
+  .presets{
+    display:flex;gap:5px;flex-wrap:wrap;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:5px 9px;margin-bottom:7px;
+  }
+  .presets b{font-size:11.5px;color:var(--sub);font-weight:bold;margin-right:2px;}
+  .presets button{
+    font-family:inherit;font-size:11.5px;padding:4px 9px;border-radius:999px;
+    border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink);
+  }
+  .presets button:hover{background:#f3f7fb;border-color:#9fb4c7;}
+
+  /* ===== レーン ===== */
+  .lanes{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .lane{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .lane.L{border-top:4px solid var(--left);}
+  .lane.R{border-top:4px solid var(--right);}
+  .laneHead{display:flex;align-items:center;gap:8px;padding:3px 10px;font-weight:bold;font-size:12.5px;}
+  .copyBtn{
+    margin-left:auto;font-family:inherit;font-size:11px;padding:2px 8px;border-radius:999px;
+    border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;opacity:.8;
+  }
+  .copyBtn:hover{opacity:1;background:rgba(255,255,255,.65);}
+  .lane.L .laneHead{background:var(--left-bg);color:var(--left);}
+  .lane.R .laneHead{background:var(--right-bg);color:var(--right);}
+
+  .controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 8px;padding:6px 10px;}
+  .ctl{display:flex;flex-direction:column;gap:3px;}
+  .ctl label{font-size:11px;color:var(--sub);}
+  .ctl select{
+    font-family:inherit;font-size:14px;padding:6px 6px;border-radius:7px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);width:100%;
+  }
+  .gearBox{grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:5px;margin-top:2px;}
+  .gearRow{display:flex;align-items:center;gap:4px;margin-bottom:3px;}
+  .gearRow .tag{font-size:11px;color:var(--sub);width:38px;flex:none;}
+  .gbtns{display:flex;gap:3px;flex:1;min-width:0;}
+  .gbtn{
+    font-family:inherit;font-size:12px;padding:4px 1px;min-width:0;flex:1;line-height:1.15;
+    border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink);
+    white-space:nowrap;overflow:hidden;
+  }
+  .gbtn b{display:block;font-size:13px;}
+  .gbtn i{display:block;font-size:9.5px;font-style:normal;color:var(--sub);}
+  .gbtn.on{color:#fff;font-weight:bold;}
+  .gbtn.on i{color:rgba(255,255,255,.85);}
+  .lane.L .gbtn.on{background:var(--left);border-color:var(--left);}
+  .lane.R .gbtn.on{background:var(--right);border-color:var(--right);}
+  .gbtn.fixed{background:#f1f4f7;color:var(--sub);cursor:default;flex:1;}
+  .shiftBtn{
+    font-family:inherit;font-size:11.5px;padding:4px 7px;flex:none;
+    border-radius:6px;border:1px solid var(--line);background:#fbfcfd;cursor:pointer;color:var(--ink);
+  }
+  .shiftBtn:hover:not(:disabled){background:#eaf1f8;border-color:#9fb4c7;}
+  .shiftBtn:disabled{opacity:.35;cursor:default;}
+  .ratioLine{display:flex;align-items:center;gap:8px;margin-top:2px;}
+  .ratioNum{font-size:15px;font-weight:bold;white-space:nowrap;}
+  .ratioNum small{font-size:11px;color:var(--sub);font-weight:normal;}
+  .scale{flex:1;height:16px;position:relative;background:linear-gradient(90deg,#cfe8d6,#f6e6b8,#f3c7c0);border-radius:8px;}
+  .scale .mark{position:absolute;top:-2px;width:4px;height:20px;background:var(--ink);border-radius:2px;transition:left .18s;}
+  .scale .t{position:absolute;top:1px;font-size:10px;color:#55606c;}
+  .scale .t.l{left:5px;} .scale .t.r{right:5px;}
+
+  canvas{display:block;width:100%;height:clamp(104px,17vh,168px);background:#bfe3f7;}
+
+  /* ===== 数値パネル ===== */
+  .readout{padding:6px 10px 8px;}
+  .speedRow{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+  .bigSpeed{font-size:34px;font-weight:bold;line-height:1;font-variant-numeric:tabular-nums;}
+  .lane.L .bigSpeed{color:var(--left);} .lane.R .bigSpeed{color:var(--right);}
+  .bigSpeed small{font-size:15px;font-weight:normal;color:var(--sub);margin-left:3px;}
+  .status{font-size:13px;font-weight:bold;padding:3px 9px;border-radius:999px;background:#eef2f6;color:var(--sub);}
+  .status.run{background:#e4f5ea;color:var(--ok);}
+  .status.stop{background:#fde8e8;color:var(--bad);}
+  .theo{margin-left:auto;text-align:right;}
+  .theo .k{font-size:10.5px;color:var(--sub);}
+  .theo .k span{display:block;font-size:9.5px;}
+  .theo .v{font-size:17px;font-weight:bold;color:var(--sub);font-variant-numeric:tabular-nums;}
+  .subgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 6px;margin-top:6px;}
+  .cell{background:#f6f9fc;border-radius:7px;padding:4px 7px;}
+  .cell .k{font-size:10.5px;color:var(--sub);}
+  .cell .v{font-size:15px;font-weight:bold;font-variant-numeric:tabular-nums;}
+  .cell .v small{font-size:10px;font-weight:normal;color:var(--sub);}
+  .gauges{margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
+  .g .gl{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);}
+  .g .gl b{color:var(--ink);font-size:12px;}
+  .gbar{height:11px;background:#e6ecf2;border-radius:6px;overflow:hidden;position:relative;}
+  .gbar i{display:block;height:100%;width:0%;border-radius:6px;transition:width .15s linear;}
+  .gbar .limit{position:absolute;top:-2px;left:100%;}
+  .msg{margin-top:5px;font-size:12.5px;min-height:18px;font-weight:bold;color:var(--bad);}
+  .msg.info{color:var(--sub);font-weight:normal;}
+  .fixBtn{
+    font-family:inherit;font-size:11.5px;margin-left:6px;padding:2px 9px;border-radius:999px;
+    border:1px solid var(--bad);background:#fff;color:var(--bad);cursor:pointer;font-weight:bold;
+  }
+  .fixBtn:hover{background:var(--bad);color:#fff;}
+  .shiftPop{
+    position:absolute;left:50%;top:14px;transform:translateX(-50%);
+    background:rgba(27,36,48,.86);color:#fff;font-size:13px;font-weight:bold;
+    padding:5px 12px;border-radius:999px;opacity:0;transition:opacity .25s;pointer-events:none;
+  }
+  .shiftPop.show{opacity:1;}
+  .canvasWrap{position:relative;}
+  .debug{
+    display:none;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#3a4756;
+    background:#f2f5f8;border-top:1px solid var(--line);padding:6px 10px;white-space:pre-wrap;
+  }
+  body.debugOn .debug{display:block;}
+
+  /* ===== くらべる帯 ===== */
+  .compare{
+    margin-top:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:7px 12px;font-size:13.5px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+  }
+  .compare b{font-size:13px;color:var(--sub);}
+  .compare .diff{font-weight:bold;}
+  .keyhint{font-size:10.5px;color:var(--sub);margin:-3px 2px 6px;}
+  .keyhint b{color:var(--ink);font-weight:bold;}
+  footer{margin-top:8px;font-size:11px;color:var(--sub);text-align:center;line-height:1.6;}
+
+  /* 画面の縦が狭いとき（Chromebookなど）はさらに詰める */
+  @media (max-height:720px){
+    header h1 span{display:none;}
+    .bigSpeed{font-size:30px;}
+    .cell .v{font-size:14px;}
+    .presets button{font-size:11px;padding:3px 8px;}
+    footer{display:none;}
+    .keyhint{display:none;}
+  }
+  @media (max-width:900px){
+    .lanes{grid-template-columns:1fr;}
+    .subgrid{grid-template-columns:repeat(4,1fr);}
+    header h1{font-size:15px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🚲 自転車ギヤ比シミュレータ<span>ギヤは「速さ」と「力」を変えるしくみ</span></h1>
+    <div class="spacer"></div>
+    <div class="modeSel">
+      <button id="modeEndless" class="on">無限走行</button>
+      <button id="modeTen">10分走行</button>
+    </div>
+    <div class="timer hidden" id="timer">10:00</div>
+    <button class="btn primary" id="startBtn">▶ スタート</button>
+    <button class="btn" id="resetBtn">リセット</button>
+    <label class="chk"><input type="checkbox" id="debugChk"> デバッグ表示</label>
+  </header>
+
+  <div class="presets" id="presets">
+    <b>くらべる例：</b>
+  </div>
+  <div class="keyhint">キー操作：<b>スペース</b>＝スタート／ストップ　<b>R</b>＝リセット　<b>A・S</b>＝左レーンの変速　<b>K・L</b>＝右レーンの変速（Shift＋で前ギヤ）　／　いまの条件はURLに残るので、ブックマークすればそのまま開けます</div>
+
+  <div class="lanes" id="lanes"></div>
+
+  <div class="compare" id="compare"></div>
+
+  <footer>
+    このシミュレータの数値は授業用のモデルです。実際の人の力や自転車の性能を正確に表したものではありません。<br>
+    自転車ギヤ比シミュレータ / Bicycle Gear Ratio Simulator
+  </footer>
+</div>
+
+<script>
+/* ==== ここから シミュレーションモデル（数値の調整はこのブロックだけで完結します）==== */
+/* =========================================================================
+   自転車ギヤ比シミュレータ  ―  物理モデル / 教育用パラメータ
+   Bicycle Gear Ratio Simulator - simulation core
+   -------------------------------------------------------------------------
+   このファイルの数値はすべて「教育用の仮想モデル」です。
+   現実の男女差・年齢差を統計的に再現したものではありません。
+   授業で見せたい差が出るように、ここの数値だけを書き換えて調整できます。
+   ========================================================================= */
+
+/* ---------- 共通の物理定数・シミュレーション設定 ---------- */
+const SIMULATION_CONFIG = {
+  gravity: 9.81,              // 重力加速度 m/s^2
+  airDensity: 1.225,          // 空気密度 kg/m^3
+  dragArea: 0.42,             // CdA 空気抵抗係数×前面投影面積 m^2（上体を起こした姿勢）
+  rollingResistance: 0.009,   // 転がり抵抗係数
+  drivetrainEfficiency: 0.95, // チェーンの伝達効率
+  crankLength: 0.170,         // クランク長 m（表示用）
+  lowSpeedRef: 0.6,           // 低速で「出力÷速度」が発散しないための基準速度 m/s
+  minCadence: 15,             // これ以下ではペダルを回し続けられない rpm（＝こげずに停止）
+  brakeSpeed: 13.9,           // 怖くてブレーキをかける速度 m/s（約50km/h）
+  referenceCadence: 80,       // 理論速度を出すときの基準ペダル回転数 rpm
+  accelBoost: 4,              // 加速だけを何倍で見せるか（授業で待たされないための時間短縮）
+                              // ※ 落ち着く速度・停止するかどうかは変わりません。
+                              //    こぎ出しの「立ちこぎ」の分だと思ってください。
+  fatiguePowerLoss: 0.40,     // 疲労100%で最大出力が何割落ちるか
+  fatigueTorqueLoss: 0.30,    // 疲労100%で最大ペダル力が何割落ちるか
+  fatigueGain: 0.0016,        // 疲労のたまりやすさ（1秒あたり）
+  fatigueRecover: 0.0010,     // 疲労の回復しやすさ（1秒あたり）
+  gameMinutes: 10,            // 10分走行モードのゲーム内時間（分）
+  gameSpeedMultiplier: 10     // 実時間の何倍で進むか（10分 → 実時間約1分）
+};
+
+/* ---------- プレーヤー（人）の能力値 ---------- */
+/*  maxPower  : 短時間なら出せる最大出力（W）
+    maxTorque : ペダルにかけられる最大の力（クランク軸まわりの平均トルク N·m）
+                → 「坂で立ちこぎしても、これ以上は踏めない」という上限
+    optCadence: 力を出しやすいペダル回転数（rpm）。これを超えると出力が落ちる
+    maxCadence: これ以上速くは足が回らない（rpm）
+    endurance : 疲れにくさ（1.0 が基準）
+    mass      : 体重（kg）                                              */
+const PLAYER_CONFIG = {
+  boy: {
+    key: 'boy', name: '中学生男子', emoji: '👦',
+    maxPower: 180, maxTorque: 33, optCadence: 85, maxCadence: 150,
+    endurance: 1.00, mass: 52,
+    // 見た目（画面ですぐ見分けられるように）：黒い学生服
+    look: {
+      outfit: 'gakuran', body: '#23272e', sleeve: '#1c2027', legs: '#3b434f',
+      shoe: '#15181d', hair: '#15161a', skin: '#f3caa2', size: 1.00, stoop: 0
+    }
+  },
+  girl: {
+    key: 'girl', name: '中学生女子', emoji: '👧',
+    maxPower: 130, maxTorque: 23, optCadence: 80, maxCadence: 140,
+    endurance: 0.85, mass: 46,
+    // セーラー服
+    look: {
+      outfit: 'sailor', body: '#f4f6f9', sleeve: '#e6eaf0', collar: '#22386b',
+      ribbon: '#c0392b', skirt: '#22386b', legs: '#f3caa2', sock: '#f4f6f9',
+      shoe: '#20242b', hair: '#241d1a', skin: '#f3caa2', size: 0.95, stoop: 0
+    }
+  },
+  elderly: {
+    key: 'elderly', name: 'お年寄り', emoji: '🧓',
+    maxPower: 90, maxTorque: 19, optCadence: 70, maxCadence: 120,
+    endurance: 0.65, mass: 55,
+    // ベージュのワンピース
+    look: {
+      outfit: 'dress', body: '#e2cda4', sleeve: '#d6bf94', skirt: '#e2cda4',
+      legs: '#e8dcc8', shoe: '#6b6259', hair: '#e2e4e6', skin: '#f0cfae',
+      glasses: true, size: 0.97, stoop: 3
+    }
+  }
+};
+
+/* ---------- 自転車 ---------- */
+/*  wheelDiameter : タイヤの外径（m）
+    fronts/rears  : 歯数。組み合わせでギヤ比が決まる
+                    ★どちらも「軽い→重い」の順にならべる（1速＝いちばん軽い）
+    frontShift    : 前ギヤを変速できるか（ママチャリは false）
+    mass          : 車体重量（kg）                                       */
+const BIKE_CONFIG = {
+  single: {
+    key: 'single', name: '変速なし自転車', short: '変速なし',
+    wheelDiameter: 0.673, mass: 18,
+    fronts: [44], rears: [18],
+    frontShift: false, rearShift: false
+  },
+  three: {
+    key: 'three', name: '3段変速自転車', short: '3段変速',
+    wheelDiameter: 0.673, mass: 19,
+    fronts: [44], rears: [26, 18, 13],
+    frontShift: false, rearShift: true,
+    rearHints: ['坂道むき', '標準', '平地・下りむき']
+  },
+  mtb: {
+    key: 'mtb', name: '21段変速マウンテンバイク', short: '21段変速MTB',
+    wheelDiameter: 0.660, mass: 13,
+    fronts: [22, 32, 42], rears: [32, 28, 24, 21, 18, 16, 14],
+    frontShift: true, rearShift: true
+  }
+};
+
+/* ---------- 道路 ---------- */
+const ROAD_CONFIG = {
+  down: { key: 'down', name: '下り坂', grade: -0.05, label: '-5%' },
+  flat: { key: 'flat', name: '平坦', grade: 0.00, label: '0%' },
+  up3: { key: 'up3', name: 'ゆるやかな上り坂', grade: 0.03, label: '+3%' },
+  up15: { key: 'up15', name: '激坂', grade: 0.15, label: '+15%' }
+};
+
+/* =========================================================================
+   計算部分
+   ========================================================================= */
+
+/* ギヤ比 = 前ギヤの歯数 ÷ 後ギヤの歯数 */
+function gearRatio(frontTeeth, rearTeeth) {
+  return frontTeeth / rearTeeth;
+}
+
+/* タイヤ1回転で進む距離（m） */
+function wheelCircumference(bike) {
+  return Math.PI * bike.wheelDiameter;
+}
+
+/* 理論速度（km/h）: 人の力を無視して、ペダルを cadence rpm で回したときの速度 */
+function theoreticalSpeedKmh(bike, ratio, cadence) {
+  const wheelRpm = cadence * ratio;
+  return wheelCircumference(bike) * wheelRpm * 60 / 1000;
+}
+
+/* 走行状態をつくる */
+function createLaneState(playerKey, bikeKey, roadKey, frontIndex, rearIndex) {
+  return {
+    playerKey: playerKey,
+    bikeKey: bikeKey,
+    roadKey: roadKey,
+    frontIndex: frontIndex || 0,
+    rearIndex: rearIndex || 0,
+    speed: 0,          // m/s
+    distance: 0,       // m
+    fatigue: 0,        // 0..1
+    stopped: false,    // 力不足で止まった
+    running: false,
+    // 表示用
+    cadence: 0, power: 0, load: 0, requiredTorque: 0, ratio: 1,
+    wheelRpm: 0, limitedBy: '-'
+  };
+}
+
+/* 現在の設定をまとめて取り出す */
+function laneSetup(state) {
+  const player = PLAYER_CONFIG[state.playerKey];
+  const bike = BIKE_CONFIG[state.bikeKey];
+  const road = ROAD_CONFIG[state.roadKey];
+  const front = bike.fronts[Math.min(state.frontIndex, bike.fronts.length - 1)];
+  const rear = bike.rears[Math.min(state.rearIndex, bike.rears.length - 1)];
+  return {
+    player: player, bike: bike, road: road,
+    front: front, rear: rear,
+    ratio: gearRatio(front, rear),
+    mass: player.mass + bike.mass
+  };
+}
+
+/* 走行に必要な力（N）。上り坂・転がり抵抗・空気抵抗の合計 */
+function resistanceForce(setup, speed) {
+  const S = SIMULATION_CONFIG;
+  const theta = Math.atan(setup.road.grade);
+  const grade = setup.mass * S.gravity * Math.sin(theta);
+  const roll = setup.mass * S.gravity * S.rollingResistance * Math.cos(theta);
+  const air = 0.5 * S.airDensity * S.dragArea * speed * speed;
+  return { grade: grade, roll: roll, air: air, total: grade + roll + air };
+}
+
+/* 人が今出せる最大の力（後輪を押す力 N）
+   ・ペダルを踏める力の上限（トルク）
+   ・出せる出力の上限（パワー、速く回しすぎると落ちる）
+   の小さいほうで決まる                                                   */
+function driveForce(setup, speed, fatigue, cadence) {
+  const S = SIMULATION_CONFIG;
+  const p = setup.player;
+  const eff = S.drivetrainEfficiency;
+  const wheelRadius = setup.bike.wheelDiameter / 2;
+
+  const maxTorque = p.maxTorque * (1 - S.fatigueTorqueLoss * fatigue);
+  const maxPower = p.maxPower * (1 - S.fatiguePowerLoss * fatigue);
+
+  // 足が回りすぎると力は出せなくなる
+  let cadFactor = 1;
+  if (cadence > p.optCadence) {
+    const span = p.maxCadence - p.optCadence;
+    const x = (cadence - p.optCadence) / span;
+    cadFactor = Math.max(0, 1 - x * x);
+  }
+
+  // 後輪を押す力 = ペダルのトルク ÷ ギヤ比 ÷ タイヤ半径
+  // （ギヤ比が大きいほど速いが、後輪を押す力は小さくなる）
+  const forceByTorque = maxTorque / setup.ratio / wheelRadius * eff;
+  const forceByPower = maxPower * cadFactor * eff / Math.max(speed, S.lowSpeedRef);
+
+  const force = Math.min(forceByTorque, forceByPower);
+  return {
+    force: Math.max(0, force),
+    limitedBy: forceByTorque <= forceByPower ? 'ペダルの重さ' : 'ペダルの回転',
+    maxTorque: maxTorque,
+    cadFactor: cadFactor
+  };
+}
+
+/* 1ステップ進める。dt はゲーム内の秒数
+   （大きな dt でも計算が暴れないよう、細かく刻んで積み上げる）      */
+function stepLane(state, dt, options) {
+  const maxStep = 0.05;
+  let rest = dt;
+  while (rest > 1e-9) {
+    const d = Math.min(maxStep, rest);
+    stepOnce(state, d, options);
+    rest -= d;
+  }
+  return state;
+}
+
+function stepOnce(state, dt, options) {
+  const S = SIMULATION_CONFIG;
+  const opt = options || {};
+  const setup = laneSetup(state);
+  const circ = wheelCircumference(setup.bike);
+  const wheelRadius = setup.bike.wheelDiameter / 2;
+
+  let v = state.speed;
+  const cadence = v / circ * 60 / setup.ratio;
+
+  const drive = driveForce(setup, v, state.fatigue, cadence);
+  const res = resistanceForce(setup, v);
+
+  let F = drive.force;
+  if (v >= S.brakeSpeed) F = 0;               // 出しすぎない
+  let a = (F - res.total) / setup.mass;
+
+  // 加速だけを accelBoost 倍で見せる（＝加速にかかる時間を短くする）
+  // 落ち着く速度も、止まるかどうかも、この値では変わらない
+  v = v + a * dt * S.accelBoost;
+  if (v < 0) v = 0;
+  if (v > S.brakeSpeed) v = S.brakeSpeed;
+
+  // 停止判定
+  // ペダルを回し続けられる最低の速さ（＝最低ケイデンスのときの速さ）で
+  // 押す力が足りなければ、もうこげない＝停止。
+  // ペダルを踏める力の上限は速度によらないので、ここで足りなければ二度と加速できない。
+  const vMin = circ * setup.ratio * S.minCadence / 60;
+  const forceAtMin = driveForce(setup, vMin, state.fatigue, S.minCadence).force;
+  const resistAtMin = resistanceForce(setup, vMin).total;
+  if (v < vMin && forceAtMin <= resistAtMin) {
+    v = 0;
+    state.stopped = true;
+  } else if (v > 0) {
+    state.stopped = false;
+  }
+
+  state.speed = v;
+  state.distance += v * dt;
+
+  // ---- 表示用の値 ----
+  const newCadence = state.stopped ? 0 : v / circ * 60 / setup.ratio;
+  // 「ペダルの重さ」＝ 今の坂と速度を保つのに必要なペダルの力 ÷ 出せる最大の力
+  const loadSpeed = Math.max(v, vMin);   // 止まっているときは「こぎ出すのに必要な力」で表す
+  const needForce = Math.max(resistanceForce(setup, loadSpeed).total, 0);
+  const needTorque = needForce * wheelRadius * setup.ratio / S.drivetrainEfficiency;
+  const loadRaw = needTorque / drive.maxTorque;
+
+  state.ratio = setup.ratio;
+  state.cadence = newCadence;
+  // 足が回りきってしまうと、それ以上こげない（惰性走行）
+  state.coasting = newCadence > setup.player.maxCadence;
+  state.wheelRpm = newCadence * setup.ratio;
+  state.power = state.stopped ? 0 : Math.max(0, F * v / S.drivetrainEfficiency);
+  state.requiredTorque = needTorque;
+  state.load = loadRaw;
+  state.limitedBy = drive.limitedBy;
+  state.resist = res;
+  state.cadFactor = drive.cadFactor;
+
+  // ---- 疲労（10分走行モードのみ）----
+  if (opt.fatigueEnabled) {
+    const sustain = 0.45 * setup.player.endurance;
+    const over = Math.min(loadRaw, 2.0) - sustain;
+    if (over > 0) {
+      state.fatigue += over * S.fatigueGain * dt;
+    } else {
+      state.fatigue += over * S.fatigueRecover * dt;
+    }
+    state.fatigue = Math.max(0, Math.min(1, state.fatigue));
+  }
+  return state;
+}
+
+/* 定常状態（速度が落ち着いたところ）を求める。テスト・チューニング用 */
+function solveSteadyState(playerKey, bikeKey, roadKey, frontIndex, rearIndex, seconds) {
+  const st = createLaneState(playerKey, bikeKey, roadKey, frontIndex, rearIndex);
+  const dt = 0.05;
+  const n = Math.round((seconds || 180) / dt);
+  for (let i = 0; i < n; i++) stepLane(st, dt, { fatigueEnabled: false });
+  return st;
+}
+/* ==== モデルここまで ==== */
+
+/* =========================================================================
+   画面（UI）とアニメーション
+   ========================================================================= */
+const LANES = {};
+const APP = {
+  mode: 'endless',      // 'endless' | 'ten'
+  running: false,
+  remain: SIMULATION_CONFIG.gameMinutes * 60,   // ゲーム内の残り秒
+  lastTs: 0,
+  finished: false
+};
+
+/* ---------- レーンのHTMLを作る ---------- */
+function laneHTML(side) {
+  const t = side === 'L' ? '左レーン' : '右レーン';
+  return `
+  <div class="lane ${side}" id="lane${side}">
+    <div class="laneHead">
+      <span>${side === 'L' ? '◀' : '▶'} ${t}</span>
+      <button class="copyBtn" data-role="copy">${side === 'L' ? '設定を右へコピー ▶' : '◀ 設定を左へコピー'}</button>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <label>① 人をえらぶ</label>
+        <select data-role="player"></select>
+      </div>
+      <div class="ctl">
+        <label>② 自転車をえらぶ</label>
+        <select data-role="bike"></select>
+      </div>
+      <div class="ctl">
+        <label>③ 道をえらぶ</label>
+        <select data-role="road"></select>
+      </div>
+      <div class="gearBox">
+        <div class="gearRow">
+          <span class="tag">前ギヤ</span>
+          <span class="gbtns" data-role="frontRow"></span>
+          <button class="shiftBtn" data-role="frontLighter" title="前ギヤを軽く">◀ 軽く</button>
+          <button class="shiftBtn" data-role="frontHeavier" title="前ギヤを重く">重く ▶</button>
+        </div>
+        <div class="gearRow">
+          <span class="tag">後ギヤ</span>
+          <span class="gbtns" data-role="rearRow"></span>
+          <button class="shiftBtn" data-role="rearLighter" title="後ギヤを軽く">◀ 軽く</button>
+          <button class="shiftBtn" data-role="rearHeavier" title="後ギヤを重く">重く ▶</button>
+        </div>
+        <div class="ratioLine">
+          <div class="ratioNum" data-role="ratio"></div>
+          <div class="scale"><span class="t l">軽い</span><span class="t r">重い</span><div class="mark" data-role="mark"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="canvasWrap">
+      <canvas data-role="canvas"></canvas>
+      <div class="shiftPop" data-role="pop">変速！</div>
+    </div>
+    <div class="readout">
+      <div class="speedRow">
+        <div class="bigSpeed" data-role="speed">0.0<small>km/h</small></div>
+        <div class="status" data-role="status">停車中</div>
+        <div class="theo">
+          <div class="k">理論速度<span>ペダルを80回転/分で回せたら</span></div>
+          <div class="v" data-role="theo">－</div>
+        </div>
+      </div>
+      <div class="subgrid">
+        <div class="cell"><div class="k">ギヤ比</div><div class="v" data-role="cRatio">－</div></div>
+        <div class="cell"><div class="k">ペダル回転</div><div class="v" data-role="cCad">0<small> rpm</small></div></div>
+        <div class="cell"><div class="k">車輪回転</div><div class="v" data-role="cWheel">0<small> rpm</small></div></div>
+        <div class="cell"><div class="k">走った距離</div><div class="v" data-role="cDist">0<small> m</small></div></div>
+      </div>
+      <div class="gauges">
+        <div class="g">
+          <div class="gl"><span>ペダルの重さ（負荷）</span><b data-role="loadTxt">0%</b></div>
+          <div class="gbar"><i data-role="loadBar"></i></div>
+        </div>
+        <div class="g">
+          <div class="gl"><span>疲れ（10分走行モード）</span><b data-role="fatTxt">0%</b></div>
+          <div class="gbar"><i data-role="fatBar"></i></div>
+        </div>
+      </div>
+      <div class="msg info" data-role="msg"></div>
+    </div>
+    <div class="debug" data-role="debug"></div>
+  </div>`;
+}
+document.getElementById('lanes').innerHTML = laneHTML('L') + laneHTML('R');
+
+/* ---------- レーンの初期化 ---------- */
+function initLane(side, playerKey, bikeKey, roadKey, fi, ri) {
+  const root = document.getElementById('lane' + side);
+  const q = (r) => root.querySelector('[data-role="' + r + '"]');
+  const lane = {
+    side: side, root: root, q: q,
+    state: createLaneState(playerKey, bikeKey, roadKey, fi, ri),
+    wheelAngle: 0, crankAngle: 0, popTimer: 0, prev: null,
+    color: side === 'L' ? '#1668c8' : '#e07000'
+  };
+  LANES[side] = lane;
+
+  // セレクトの中身
+  const ps = q('player');
+  for (const k in PLAYER_CONFIG) ps.add(new Option(PLAYER_CONFIG[k].emoji + ' ' + PLAYER_CONFIG[k].name, k));
+  ps.value = playerKey;
+  const bs = q('bike');
+  for (const k in BIKE_CONFIG) bs.add(new Option(BIKE_CONFIG[k].name, k));
+  bs.value = bikeKey;
+  const rs = q('road');
+  for (const k in ROAD_CONFIG) rs.add(new Option(ROAD_CONFIG[k].name + '（' + ROAD_CONFIG[k].label + '）', k));
+  rs.value = roadKey;
+
+  ps.addEventListener('change', () => {
+    lane.state.playerKey = ps.value;
+    lane.state.fatigue = 0;            // 人が変われば疲れもリセット
+    refreshLane(lane, true); saveToUrl();
+  });
+  bs.addEventListener('change', () => {
+    // 自転車が変わったら、そのレーンの走行状態はリセット（仕様11）
+    const st = lane.state;
+    const keep = { p: st.playerKey, r: st.roadKey };
+    lane.state = createLaneState(keep.p, bs.value, keep.r, defaultFrontIndex(bs.value), defaultRearIndex(bs.value));
+    lane.wheelAngle = 0; lane.crankAngle = 0;
+    buildGearButtons(lane);
+    refreshLane(lane, true); saveToUrl();
+  });
+  rs.addEventListener('change', () => { lane.state.roadKey = rs.value; refreshLane(lane, true); saveToUrl(); });
+  q('frontLighter').addEventListener('click', () => shift(lane, 'front', -1));
+  q('frontHeavier').addEventListener('click', () => shift(lane, 'front', +1));
+  q('rearLighter').addEventListener('click', () => shift(lane, 'rear', -1));
+  q('rearHeavier').addEventListener('click', () => shift(lane, 'rear', +1));
+  q('copy').addEventListener('click', () => copySettings(side));
+
+  buildGearButtons(lane);
+  setupCanvas(lane);
+  refreshLane(lane, true);
+  return lane;
+}
+
+/* 自転車ごとの標準ギヤ（まん中あたり） */
+function defaultRearIndex(bikeKey) {
+  if (bikeKey === 'three') return 1;
+  if (bikeKey === 'mtb') return 3;
+  return 0;
+}
+function defaultFrontIndex(bikeKey) {
+  return bikeKey === 'mtb' ? 1 : 0;
+}
+
+/* 「1速（軽い）」〜「N速（重い）」の表示をつくる */
+function speedLabel(i, n) {
+  const num = (i + 1) + '速';
+  if (n === 1) return { main: num, sub: '' };
+  if (i === 0) return { main: num, sub: '軽い' };
+  if (i === n - 1) return { main: num, sub: '重い' };
+  return { main: num, sub: '' };
+}
+
+/* 片方のレーンの設定を、もう片方にコピーする（変える条件を1つだけにするため） */
+function copySettings(fromSide) {
+  const from = LANES[fromSide], to = LANES[fromSide === 'L' ? 'R' : 'L'];
+  const f = from.state;
+  to.state = createLaneState(f.playerKey, f.bikeKey, f.roadKey, f.frontIndex, f.rearIndex);
+  to.q('player').value = f.playerKey;
+  to.q('bike').value = f.bikeKey;
+  to.q('road').value = f.roadKey;
+  to.wheelAngle = 0; to.crankAngle = 0;
+  buildGearButtons(to);
+  refreshLane(to, true);
+  resetRun();
+  saveToUrl();
+}
+
+/* ---------- ギヤ選択ボタンを作り直す ---------- */
+function buildGearButtons(lane) {
+  const st = lane.state;
+  const bike = BIKE_CONFIG[st.bikeKey];
+
+  const fill = (row, teeth, shiftable, hints, onPick) => {
+    row.innerHTML = '';
+    if (!shiftable) {
+      const b = document.createElement('button');
+      b.className = 'gbtn fixed';
+      b.innerHTML = '<b>変速できません</b><i>' + teeth[0] + 'T のまま</i>';
+      row.appendChild(b);
+      return;
+    }
+    teeth.forEach((t, i) => {
+      const lab = speedLabel(i, teeth.length);
+      const b = document.createElement('button');
+      b.className = 'gbtn';
+      b.innerHTML = '<b>' + lab.main + '</b><i>' + (lab.sub || (hints ? hints[i] : t + 'T')) + '</i>';
+      b.title = lab.main + '（' + t + 'T' + (hints ? '・' + hints[i] : '') + '）';
+      b.dataset.idx = i;
+      b.addEventListener('click', () => onPick(i));
+      row.appendChild(b);
+    });
+  };
+
+  fill(lane.q('frontRow'), bike.fronts, bike.frontShift, null,
+    (i) => changeGear(lane, i, st.rearIndex));
+  fill(lane.q('rearRow'), bike.rears, bike.rearShift, bike.rearHints,
+    (i) => changeGear(lane, st.frontIndex, i));
+
+  lane.q('frontLighter').disabled = !bike.frontShift;
+  lane.q('frontHeavier').disabled = !bike.frontShift;
+  lane.q('rearLighter').disabled = !bike.rearShift;
+  lane.q('rearHeavier').disabled = !bike.rearShift;
+}
+
+/* ---------- 変速 ---------- */
+function changeGear(lane, fi, ri) {
+  const st = lane.state;
+  if (st.frontIndex === fi && st.rearIndex === ri) return;
+  const before = { ratio: laneSetup(st).ratio };
+  st.frontIndex = fi; st.rearIndex = ri;
+  refreshLane(lane, true);
+  showShift(lane, before);
+  saveToUrl();
+}
+function shift(lane, which, dir) {   // dir:-1 軽く / +1 重く
+  const st = lane.state;
+  const bike = BIKE_CONFIG[st.bikeKey];
+  if (which === 'front') {
+    if (!bike.frontShift) return;
+    const i = Math.max(0, Math.min(bike.fronts.length - 1, st.frontIndex + dir));
+    changeGear(lane, i, st.rearIndex);
+  } else {
+    if (!bike.rearShift) return;
+    const i = Math.max(0, Math.min(bike.rears.length - 1, st.rearIndex + dir));
+    changeGear(lane, st.frontIndex, i);
+  }
+}
+function showShift(lane, before) {
+  const now = laneSetup(lane.state).ratio;
+  const pop = lane.q('pop');
+  const dirTxt = now > before.ratio ? '重いギヤへ' : '軽いギヤへ';
+  pop.textContent = '変速！ ギヤ比 ' + before.ratio.toFixed(2) + ' → ' + now.toFixed(2) + '（' + dirTxt + '）';
+  pop.classList.add('show');
+  clearTimeout(lane.popTimer);
+  lane.popTimer = setTimeout(() => pop.classList.remove('show'), 1400);
+}
+
+/* ---------- キャンバス準備 ---------- */
+function setupCanvas(lane) {
+  const c = lane.q('canvas');
+  lane.ctx = c.getContext('2d');
+  const fit = () => {
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth, h = c.clientHeight;
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    lane.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lane.cw = w; lane.ch = h;
+  };
+  fit();
+  window.addEventListener('resize', fit);
+}
+
+/* =========================================================================
+   自転車の絵
+   ========================================================================= */
+function drawScene(lane) {
+  const ctx = lane.ctx, W = lane.cw, H = lane.ch;
+  const st = lane.state;
+  const setup = laneSetup(st);
+  const grade = setup.road.grade;
+  // 見やすいように傾きを強調して描く（上り坂は右上がり＝進む方向が高くなる）
+  const angle = Math.atan(grade) * 2.2;
+  ctx.clearRect(0, 0, W, H);
+
+  // 空
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#a9dcf7'); sky.addColorStop(1, '#dff0fb');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+  const bikeX = W * 0.34;
+  const groundY = H * 0.78;
+  const bikeScale = Math.max(0.62, Math.min(1.05, (groundY - 6) / 88));
+  const pxPerM = 14;                          // 1m を何ピクセルで描くか
+  const scroll = st.distance * pxPerM;
+
+  // 遠くの山（ゆっくり流れる）
+  ctx.save();
+  ctx.fillStyle = '#a9c9b3';
+  const hillOff = (scroll * 0.12) % 420;
+  for (let i = -1; i < W / 420 + 2; i++) {
+    const x = i * 420 - hillOff;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY + 30);
+    ctx.quadraticCurveTo(x + 105, groundY - 58, x + 210, groundY + 30);
+    ctx.quadraticCurveTo(x + 315, groundY - 30, x + 420, groundY + 30);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 坂の面（自転車の接地点を中心に回転）
+  ctx.save();
+  ctx.translate(bikeX, groundY);
+  ctx.rotate(-angle);
+
+  const far = W * 2;
+  ctx.fillStyle = '#6d6f74';
+  ctx.fillRect(-far, 0, far * 2, far);   // 坂の下側は地面でうめる（空が見えないように）
+  ctx.fillStyle = '#8b8e94';
+  ctx.fillRect(-far, 0, far * 2, 4);
+
+  // センターライン（流れる）
+  ctx.fillStyle = '#f2f2f2';
+  const dash = 46, gap = 34, period = dash + gap;
+  let s = -((scroll) % period);
+  for (let x = -far + s; x < far; x += period) ctx.fillRect(x, 22, dash, 5);
+
+  // 路側のポール（速さが目でわかる）
+  const poleGap = 8 * pxPerM;
+  let p = -((scroll) % poleGap);
+  for (let x = -far + p; x < far; x += poleGap) {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, -34, 5, 34);
+    ctx.fillStyle = '#e04b4b'; ctx.fillRect(x, -34, 5, 9);
+  }
+
+  ctx.save();
+  ctx.scale(bikeScale, bikeScale);
+  drawBike(ctx, lane, st);
+  ctx.restore();
+  ctx.restore();
+
+  // 止まっているとき（画面にまっすぐ出す）
+  if (st.stopped && APP.running) {
+    const bw = 104, bh = 24, bx = Math.min(W - bw - 6, bikeX + 66), by = Math.max(4, groundY - 96 * bikeScale);
+    ctx.fillStyle = 'rgba(198,40,40,.94)';
+    roundRect(ctx, bx, by, bw, bh, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('こげない！', bx + bw / 2, by + bh / 2);
+    ctx.textAlign = 'left';
+  }
+
+  // 勾配のラベル
+  ctx.fillStyle = 'rgba(27,36,48,.72)';
+  roundRect(ctx, 8, 8, 118, 22, 6); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textBaseline = 'middle';
+  ctx.fillText(setup.road.name + ' ' + setup.road.label, 14, 20);
+
+  // 距離
+  ctx.fillStyle = 'rgba(255,255,255,.8)';
+  roundRect(ctx, W - 104, 8, 96, 22, 6); ctx.fill();
+  ctx.fillStyle = '#1b2430'; ctx.font = 'bold 12px sans-serif';
+  ctx.fillText((st.distance / 1000).toFixed(2) + ' km 走行', W - 98, 20);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* ひざの位置を求める（もも・すねの長さから）。ペダルをこぐ足を自然に見せるため */
+function kneePos(hx, hy, px, py, l1, l2) {
+  let dx = px - hx, dy = py - hy;
+  let d = Math.hypot(dx, dy);
+  d = Math.min(d, l1 + l2 - 0.01);
+  if (d < 0.01) d = 0.01;
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const mx = hx + a * dx / d, my = hy + a * dy / d;
+  // ひざは前（進行方向）に出るほうを選ぶ
+  const k1 = { x: mx + h * (dy / d), y: my - h * (dx / d) };
+  const k2 = { x: mx - h * (dy / d), y: my + h * (dx / d) };
+  return k1.x > k2.x ? k1 : k2;
+}
+
+function drawBike(ctx, lane, st) {
+  const R = 22;                  // 車輪の半径（絵）
+  const yb = -R;                 // 車軸の高さ（地面が y=0）
+  const rearX = -30, frontX = 34, crankX = 0;
+  const col = lane.color;
+  const dark = '#22303c';
+
+  // ---- 車輪 ----
+  ctx.lineCap = 'butt';
+  [rearX, frontX].forEach((wx) => {
+    ctx.lineWidth = 3.4; ctx.strokeStyle = dark;
+    ctx.beginPath(); ctx.arc(wx, yb, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.save(); ctx.translate(wx, yb); ctx.rotate(lane.wheelAngle);
+    ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(34,48,60,.45)';
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 6;
+      ctx.beginPath();
+      ctx.moveTo(-R * Math.cos(a), -R * Math.sin(a));
+      ctx.lineTo(R * Math.cos(a), R * Math.sin(a));
+      ctx.stroke();
+    }
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  });
+
+  // ---- フレーム ----
+  const seatTop = { x: -12, y: yb - 26 };     // サドルの下
+  const headTop = { x: 28, y: yb - 24 };      // ハンドルの付け根
+  ctx.lineWidth = 4.2; ctx.strokeStyle = col; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(rearX, yb); ctx.lineTo(crankX, yb);          // チェーンステー
+  ctx.lineTo(seatTop.x, seatTop.y);                       // シートチューブ
+  ctx.lineTo(rearX, yb);                                  // シートステー
+  ctx.moveTo(seatTop.x, seatTop.y); ctx.lineTo(headTop.x, headTop.y);  // トップチューブ
+  ctx.lineTo(frontX, yb);                                 // フォーク
+  ctx.moveTo(crankX, yb); ctx.lineTo(headTop.x, headTop.y);            // ダウンチューブ
+  ctx.stroke();
+
+  // サドル・ハンドル
+  ctx.strokeStyle = dark; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(seatTop.x - 6, seatTop.y - 2); ctx.lineTo(seatTop.x + 5, seatTop.y - 2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(headTop.x, headTop.y); ctx.lineTo(headTop.x + 4, headTop.y - 10);
+  ctx.lineTo(headTop.x + 13, headTop.y - 10); ctx.stroke();
+
+  // ---- クランクとペダル ----
+  const ca = lane.crankAngle;
+  const cr = 10;
+  const pedals = [
+    { x: crankX + cr * Math.cos(ca), y: yb + cr * Math.sin(ca) },
+    { x: crankX - cr * Math.cos(ca), y: yb - cr * Math.sin(ca) }
+  ];
+  ctx.strokeStyle = 'rgba(34,48,60,.55)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(crankX, yb, 8.5, 0, Math.PI * 2); ctx.stroke();   // チェーンリング
+  ctx.beginPath(); ctx.moveTo(crankX, yb); ctx.lineTo(rearX, yb); ctx.stroke(); // チェーン
+  ctx.strokeStyle = dark; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(pedals[1].x, pedals[1].y); ctx.lineTo(pedals[0].x, pedals[0].y); ctx.stroke();
+  ctx.fillStyle = dark;
+  pedals.forEach(p => ctx.fillRect(p.x - 4, p.y - 1.6, 8, 3.2));
+
+  // ---- 人（服そうで、だれが乗っているかひと目で分かるようにする）----
+  const P = PLAYER_CONFIG[st.playerKey];
+  const look = P.look;
+  const sc = look.size;
+  const load = Math.min(1.3, Math.max(0, st.load));
+  const lean = (st.stopped ? 7 : Math.min(7, load * 6)) + look.stoop;   // 重いほど前かがみ
+  const hip = { x: -8, y: yb - 30 * sc };
+  const sho = { x: 11 + lean * 0.5, y: yb - 52 * sc + lean * 0.6 };
+  const hand = { x: headTop.x + 9, y: headTop.y - 9 };
+  const head = { x: sho.x + 6, y: sho.y - 9 * sc };
+
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  const drawLeg = (pedal, shade) => {
+    const k = kneePos(hip.x, hip.y, pedal.x, pedal.y, 21 * sc, 23 * sc);
+    ctx.strokeStyle = shade(look.legs); ctx.lineWidth = 4.8 * sc;
+    ctx.beginPath();
+    ctx.moveTo(hip.x, hip.y); ctx.lineTo(k.x, k.y); ctx.lineTo(pedal.x, pedal.y);
+    ctx.stroke();
+    if (look.sock) {              // 白いソックス
+      ctx.strokeStyle = shade(look.sock); ctx.lineWidth = 4.8 * sc;
+      const t = 0.72;
+      ctx.beginPath();
+      ctx.moveTo(k.x + (pedal.x - k.x) * t, k.y + (pedal.y - k.y) * t);
+      ctx.lineTo(pedal.x, pedal.y); ctx.stroke();
+    }
+    ctx.fillStyle = shade(look.shoe);   // くつ
+    ctx.beginPath(); ctx.arc(pedal.x, pedal.y, 2.9 * sc, 0, Math.PI * 2); ctx.fill();
+  };
+  const darker = (c) => c;                        // 手前の足
+  const back = (c) => 'rgba(0,0,0,0.18)';          // 奥の足は影にして重なりを分かりやすく
+
+  // 奥の足
+  const kBack = kneePos(hip.x, hip.y, pedals[1].x, pedals[1].y, 21 * sc, 23 * sc);
+  ctx.strokeStyle = 'rgba(30,40,52,.45)'; ctx.lineWidth = 4.4 * sc;
+  ctx.beginPath();
+  ctx.moveTo(hip.x, hip.y); ctx.lineTo(kBack.x, kBack.y); ctx.lineTo(pedals[1].x, pedals[1].y);
+  ctx.stroke();
+
+  // 胴（服）
+  ctx.strokeStyle = look.body; ctx.lineWidth = 8.5 * sc;
+  ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(sho.x, sho.y); ctx.stroke();
+
+  // 腕（そで）
+  ctx.strokeStyle = look.sleeve; ctx.lineWidth = 4 * sc;
+  ctx.beginPath(); ctx.moveTo(sho.x, sho.y); ctx.lineTo(hand.x, hand.y); ctx.stroke();
+  ctx.strokeStyle = look.skin; ctx.lineWidth = 3.2 * sc;   // 手首から先
+  ctx.beginPath();
+  ctx.moveTo(sho.x + (hand.x - sho.x) * 0.72, sho.y + (hand.y - sho.y) * 0.72);
+  ctx.lineTo(hand.x, hand.y); ctx.stroke();
+
+  // 手前の足
+  drawLeg(pedals[0], darker);
+
+  // スカート・ワンピースのすそ
+  if (look.skirt) {
+    ctx.fillStyle = look.skirt;
+    ctx.beginPath();
+    ctx.moveTo(hip.x - 9, hip.y - 5 * sc);
+    ctx.lineTo(hip.x + 7, hip.y - 2 * sc);
+    ctx.lineTo(hip.x + 10, hip.y + 9 * sc);
+    ctx.lineTo(hip.x - 13, hip.y + 6 * sc);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // えり
+  if (look.outfit === 'sailor') {            // セーラーえり＋赤いリボン
+    ctx.fillStyle = look.collar;
+    ctx.beginPath();
+    ctx.moveTo(sho.x - 7, sho.y - 3);
+    ctx.lineTo(sho.x + 5, sho.y + 1);
+    ctx.lineTo(sho.x - 4, sho.y + 13);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = look.ribbon;
+    ctx.beginPath(); ctx.arc(sho.x + 2.5, sho.y + 4, 2.6, 0, Math.PI * 2); ctx.fill();
+  } else if (look.outfit === 'gakuran') {    // 学生服の立てえり
+    ctx.strokeStyle = '#d9dde3'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(sho.x - 4, sho.y - 2); ctx.lineTo(sho.x + 4, sho.y + 1); ctx.stroke();
+  }
+
+  // 髪（うしろ側）
+  if (look.outfit === 'sailor') {
+    ctx.fillStyle = look.hair;
+    ctx.beginPath(); ctx.ellipse(head.x - 5, head.y + 2, 6, 8.5, -0.25, 0, Math.PI * 2); ctx.fill();
+  } else if (look.outfit === 'dress') {
+    ctx.fillStyle = look.hair;
+    ctx.beginPath(); ctx.arc(head.x - 4.5, head.y + 1, 5.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 顔
+  ctx.fillStyle = look.skin;
+  ctx.beginPath(); ctx.arc(head.x, head.y, 7 * sc, 0, Math.PI * 2); ctx.fill();
+  // 髪（頭の上）
+  ctx.fillStyle = look.hair;
+  ctx.beginPath();
+  ctx.arc(head.x, head.y - 1, 7.4 * sc, Math.PI * 0.98, Math.PI * 2.08);
+  ctx.fill();
+  if (look.outfit === 'gakuran') {   // 短い前髪
+    ctx.beginPath(); ctx.ellipse(head.x + 3, head.y - 3.5, 4.5, 2.6, 0.4, 0, Math.PI * 2); ctx.fill();
+  }
+  // 目
+  ctx.fillStyle = 'rgba(28,36,46,.9)';
+  ctx.beginPath(); ctx.arc(head.x + 4.6, head.y + 0.4, 1.25, 0, Math.PI * 2); ctx.fill();
+  // めがね（お年寄り）
+  if (look.glasses) {
+    ctx.strokeStyle = 'rgba(40,48,58,.8)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(head.x + 4.4, head.y + 0.4, 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(head.x + 1.5, head.y - 0.4); ctx.lineTo(head.x - 1.5, head.y - 1.2); ctx.stroke();
+  }
+}
+
+/* =========================================================================
+   表示の更新
+   ========================================================================= */
+function refreshLane(lane, gearOnly) {
+  const st = lane.state;
+  const setup = laneSetup(st);
+  const bike = setup.bike;
+
+  // ギヤボタンの選択状態
+  lane.q('frontRow').querySelectorAll('.gbtn').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.idx) === st.frontIndex);
+  });
+  lane.q('rearRow').querySelectorAll('.gbtn').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.idx) === st.rearIndex);
+  });
+  lane.q('frontLighter').disabled = !setup.bike.frontShift || st.frontIndex === 0;
+  lane.q('frontHeavier').disabled = !setup.bike.frontShift || st.frontIndex === setup.bike.fronts.length - 1;
+  lane.q('rearLighter').disabled = !setup.bike.rearShift || st.rearIndex === 0;
+  lane.q('rearHeavier').disabled = !setup.bike.rearShift || st.rearIndex === setup.bike.rears.length - 1;
+
+  // ギヤ比の表示
+  const ratio = setup.ratio;
+  const theo = theoreticalSpeedKmh(bike, ratio, SIMULATION_CONFIG.referenceCadence);
+  const fLab = bike.frontShift ? (st.frontIndex + 1) + '速' : '固定';
+  const rLab = bike.rearShift ? (st.rearIndex + 1) + '速' : '固定';
+  lane.q('ratio').innerHTML =
+    '<span>前' + fLab + '(' + setup.front + 'T) / 後' + rLab + '(' + setup.rear + 'T)</span> ' +
+    'ギヤ比 ' + ratio.toFixed(2) +
+    '<small>　ペダル1回転で ' + (wheelCircumference(bike) * ratio).toFixed(2) + ' m 進む</small>';
+
+  // 軽い⇔重い の位置（0.69〜3.82 を対数で並べる）
+  const lo = Math.log(0.65), hi = Math.log(3.5);
+  const pos = Math.max(0.06, Math.min(0.94, (Math.log(ratio) - lo) / (hi - lo)));
+  lane.q('mark').style.left = 'calc(' + (pos * 100) + '% - 2px)';
+
+  lane.q('cRatio').textContent = ratio.toFixed(2);
+  lane.theoSpeed = theo;
+  st.ratio = ratio;
+}
+
+function updateReadout(lane) {
+  const st = lane.state;
+  const setup = laneSetup(st);
+  const kmh = st.speed * 3.6;
+  lane.q('speed').innerHTML = kmh.toFixed(1) + '<small>km/h</small>';
+  lane.q('cCad').innerHTML = st.coasting
+    ? '0<small> rpm（空回し）</small>'
+    : Math.round(st.cadence) + '<small> rpm</small>';
+  lane.q('cWheel').innerHTML = Math.round(st.wheelRpm) + '<small> rpm</small>';
+  lane.q('theo').textContent = lane.theoSpeed.toFixed(1) + ' km/h';
+  lane.q('cDist').innerHTML = st.distance < 1000
+    ? Math.round(st.distance) + '<small> m</small>'
+    : (st.distance / 1000).toFixed(2) + '<small> km</small>';
+
+  const loadPct = st.load * 100;
+  const lb = lane.q('loadBar');
+  lb.style.width = Math.min(100, loadPct) + '%';
+  lb.style.background = loadPct > 100 ? 'var(--bad)' : loadPct > 85 ? 'var(--warn)' : 'var(--ok)';
+  lane.q('loadTxt').textContent = Math.round(loadPct) + '%';
+
+  const fb = lane.q('fatBar');
+  fb.style.width = (st.fatigue * 100) + '%';
+  fb.style.background = st.fatigue > 0.7 ? 'var(--bad)' : st.fatigue > 0.4 ? 'var(--warn)' : '#7aa7d6';
+  lane.q('fatTxt').textContent = Math.round(st.fatigue * 100) + '%';
+
+  const status = lane.q('status');
+  const msg = lane.q('msg');
+  if (st.stopped) {
+    status.textContent = '停止';
+    status.className = 'status stop';
+    msg.className = 'msg';
+    const canLighter = (setup.bike.rearShift && st.rearIndex > 0) || (setup.bike.frontShift && st.frontIndex > 0);
+    if (lane.lastMsgKey !== 'stopped' + canLighter) {
+      msg.innerHTML = '力が足りず、自転車が止まりました。' +
+        (canLighter ? '<button class="fixBtn" data-role="fix">1つ軽いギヤにする</button>'
+                    : 'これ以上軽いギヤがありません。');
+      lane.lastMsgKey = 'stopped' + canLighter;
+      const fx = msg.querySelector('.fixBtn');
+      if (fx) fx.addEventListener('click', () => {
+        if (setup.bike.rearShift && st.rearIndex > 0) shift(lane, 'rear', -1);
+        else shift(lane, 'front', -1);
+      });
+    }
+  } else if (APP.running) {
+    status.textContent = st.coasting ? '▶ 惰性走行' : '▶ 走行中';
+    status.className = 'status run';
+    msg.className = 'msg info';
+    lane.lastMsgKey = null;
+    if (st.coasting) msg.textContent = '足が回りきって、これ以上こげません（惰性で走っています）。';
+    else if (loadPct > 92) msg.textContent = 'ペダルがとても重い。ぎりぎりです。';
+    else if (st.cadence > setup.player.optCadence + 25) msg.textContent = 'ペダルが軽すぎて、足が回りすぎています。';
+    else if (loadPct < 25 && setup.road.grade >= 0) msg.textContent = 'ペダルは軽いけれど、スピードは出ていません。';
+    else msg.textContent = '';
+  } else {
+    status.textContent = '停車中';
+    status.className = 'status';
+    msg.className = 'msg info';
+    lane.lastMsgKey = null;
+    msg.textContent = '';
+  }
+
+  if (document.body.classList.contains('debugOn')) {
+    const r = st.resist || { grade: 0, roll: 0, air: 0, total: 0 };
+    lane.q('debug').textContent =
+      'DEBUG  ギヤ比 ' + st.ratio.toFixed(3) + ' / 理論速度(80rpm) ' + lane.theoSpeed.toFixed(1) + ' km/h\n' +
+      '入力パワー ' + st.power.toFixed(0) + ' W  最大 ' + setup.player.maxPower + ' W  疲労係数 ' + (1 - SIMULATION_CONFIG.fatiguePowerLoss * st.fatigue).toFixed(2) + '\n' +
+      '必要トルク ' + st.requiredTorque.toFixed(1) + ' N·m / 最大 ' + (setup.player.maxTorque * (1 - SIMULATION_CONFIG.fatigueTorqueLoss * st.fatigue)).toFixed(1) + ' N·m\n' +
+      '勾配抵抗 ' + r.grade.toFixed(1) + ' N / 転がり ' + r.roll.toFixed(1) + ' N / 空気 ' + r.air.toFixed(1) + ' N / 合計 ' + r.total.toFixed(1) + ' N\n' +
+      '制限 ' + st.limitedBy + ' / 総重量 ' + setup.mass.toFixed(0) + ' kg / ケイデンス係数 ' + (st.cadFactor || 0).toFixed(2);
+  }
+}
+
+/* ---------- 左右のくらべ ---------- */
+function updateCompare() {
+  const L = LANES.L.state, R = LANES.R.state;
+  const sl = L.stopped ? 0 : L.speed * 3.6, sr = R.stopped ? 0 : R.speed * 3.6;
+  const dl = L.distance, dr = R.distance;
+  const el = document.getElementById('compare');
+  const nameOf = (s) => PLAYER_CONFIG[s.playerKey].name + '・' + BIKE_CONFIG[s.bikeKey].short + '・' + ROAD_CONFIG[s.roadKey].label;
+  let diff = '';
+  if (Math.abs(sl - sr) < 0.15) diff = '<span class="diff">速さはほぼ同じ</span>';
+  else if (sl > sr) diff = '<span class="diff" style="color:var(--left)">左が ' + (sl - sr).toFixed(1) + ' km/h 速い</span>';
+  else diff = '<span class="diff" style="color:var(--right)">右が ' + (sr - sl).toFixed(1) + ' km/h 速い</span>';
+  const loadDiff = Math.round((L.load - R.load) * 100);
+  let ld = '';
+  if (Math.abs(loadDiff) >= 3) {
+    ld = loadDiff > 0
+      ? '<span class="diff" style="color:var(--right)">右のほうがペダルが ' + Math.abs(loadDiff) + ' ポイント軽い</span>'
+      : '<span class="diff" style="color:var(--left)">左のほうがペダルが ' + Math.abs(loadDiff) + ' ポイント軽い</span>';
+  }
+  el.innerHTML =
+    '<b>くらべる：</b>' +
+    '<span style="color:var(--left)">◀ ' + nameOf(L) + '</span>' +
+    '<span style="color:var(--right)">▶ ' + nameOf(R) + '</span>' +
+    diff + ld +
+    '<span style="color:var(--sub)">走った距離　左 ' + fmtDist(dl) + '／右 ' + fmtDist(dr) + '</span>';
+}
+function fmtDist(d) { return d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(2) + ' km'; }
+
+/* =========================================================================
+   メインループ
+   ========================================================================= */
+function tick(ts) {
+  requestAnimationFrame(tick);
+  if (!APP.lastTs) APP.lastTs = ts;
+  let dtReal = (ts - APP.lastTs) / 1000;
+  APP.lastTs = ts;
+  if (dtReal > 0.1) dtReal = 0.1;
+
+  const speedUp = (APP.mode === 'ten') ? SIMULATION_CONFIG.gameSpeedMultiplier : 1;
+  const dtGame = APP.running ? dtReal * speedUp : 0;
+
+  if (APP.running && APP.mode === 'ten') {
+    APP.remain -= dtGame;
+    if (APP.remain <= 0) { APP.remain = 0; finishRun(); }
+    updateTimer();
+  }
+
+  for (const side of ['L', 'R']) {
+    const lane = LANES[side];
+    const st = lane.state;
+    if (dtGame > 0) {
+      stepLane(st, dtGame, { fatigueEnabled: APP.mode === 'ten' });
+    }
+    // アニメーション（見た目は実時間で回す）
+    const setup = laneSetup(st);
+    const circ = wheelCircumference(setup.bike);
+    const wheelRps = st.speed / circ;                 // 1秒あたりの車輪回転
+    lane.wheelAngle += wheelRps * 2 * Math.PI * dtReal;
+    if (!st.coasting) lane.crankAngle += (wheelRps / setup.ratio) * 2 * Math.PI * dtReal;
+    drawScene(lane);
+    updateReadout(lane);
+  }
+  if (!APP.finished) updateCompare();   // 10分走行の結果表示は消さない
+}
+
+function updateTimer() {
+  const t = Math.max(0, Math.ceil(APP.remain));
+  const m = Math.floor(t / 60), s = t % 60;
+  document.getElementById('timer').textContent = m + ':' + String(s).padStart(2, '0');
+}
+
+function setRunning(on) {
+  APP.running = on;
+  const b = document.getElementById('startBtn');
+  b.textContent = on ? '■ ストップ' : '▶ スタート';
+  b.classList.toggle('stop', on);
+  if (on) APP.finished = false;
+}
+
+function finishRun() {
+  setRunning(false);
+  APP.finished = true;
+  const L = LANES.L.state, R = LANES.R.state;
+  const el = document.getElementById('compare');
+  const winner = L.distance > R.distance ? '左' : (R.distance > L.distance ? '右' : '同じ');
+  el.innerHTML = '<b>10分走行おわり：</b>' +
+    '<span style="color:var(--left)">◀ ' + fmtDist(L.distance) + '</span>' +
+    '<span style="color:var(--right)">▶ ' + fmtDist(R.distance) + '</span>' +
+    '<span class="diff">' + (winner === '同じ' ? '同じ距離でした' : winner + 'のほうが遠くまで進みました') + '</span>' +
+    '<span style="color:var(--sub)">疲れ　左 ' + Math.round(L.fatigue * 100) + '%／右 ' + Math.round(R.fatigue * 100) + '%</span>';
+}
+
+function resetRun(keepSettings) {
+  for (const side of ['L', 'R']) {
+    const lane = LANES[side], st = lane.state;
+    st.speed = 0; st.distance = 0; st.fatigue = 0; st.stopped = false;
+    st.cadence = 0; st.wheelRpm = 0; st.load = 0; st.power = 0;
+    lane.wheelAngle = 0; lane.crankAngle = 0;
+  }
+  APP.remain = SIMULATION_CONFIG.gameMinutes * 60;
+  APP.finished = false;
+  updateTimer();
+}
+
+/* ---------- ヘッダーの操作 ---------- */
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (!APP.running && APP.finished) resetRun();
+  setRunning(!APP.running);
+});
+document.getElementById('resetBtn').addEventListener('click', () => { setRunning(false); resetRun(); });
+document.getElementById('debugChk').addEventListener('change', (e) => {
+  document.body.classList.toggle('debugOn', e.target.checked);
+});
+function setMode(mode) {
+  APP.mode = mode;
+  document.getElementById('modeEndless').classList.toggle('on', mode === 'endless');
+  document.getElementById('modeTen').classList.toggle('on', mode === 'ten');
+  document.getElementById('timer').classList.toggle('hidden', mode !== 'ten');
+  setRunning(false); resetRun(); saveToUrl();
+}
+document.getElementById('modeEndless').addEventListener('click', () => setMode('endless'));
+document.getElementById('modeTen').addEventListener('click', () => setMode('ten'));
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (!APP.running && APP.finished) resetRun();
+    setRunning(!APP.running);
+    return;
+  }
+  // A / S＝左レーンの変速、K / L＝右レーンの変速（Shiftを押しながらだと前ギヤ）
+  const map = { a: ['L', -1], s: ['L', 1], k: ['R', -1], l: ['R', 1] };
+  if (map[k]) {
+    e.preventDefault();
+    shift(LANES[map[k][0]], e.shiftKey ? 'front' : 'rear', map[k][1]);
+  } else if (k === 'r') {
+    setRunning(false); resetRun();
+  }
+});
+
+/* ---------- 授業用プリセット ---------- */
+const PRESETS = [
+  { name: '変速なし vs 3段変速（女子・3%の坂）',
+    L: ['girl', 'single', 'up3', 0, 0], R: ['girl', 'three', 'up3', 0, 0] },
+  { name: '同じ坂でも人がちがうと（男子 vs お年寄り・3%・変速なし）',
+    L: ['boy', 'single', 'up3', 0, 0], R: ['elderly', 'single', 'up3', 0, 0] },
+  { name: '軽いギヤ vs 重いギヤ（男子・平坦・21段）',
+    L: ['boy', 'mtb', 'flat', 0, 0], R: ['boy', 'mtb', 'flat', 2, 6] },
+  { name: '激坂に挑戦（男子 vs 女子・15%・いちばん軽いギヤ）',
+    L: ['boy', 'mtb', 'up15', 0, 0], R: ['girl', 'mtb', 'up15', 0, 0] },
+  { name: '下り坂は重いギヤが速い（男子・-5%）',
+    L: ['boy', 'mtb', 'down', 0, 0], R: ['boy', 'mtb', 'down', 2, 6] },
+  { name: 'はじめの画面にもどす',
+    L: ['boy', 'single', 'flat', 0, 0], R: ['boy', 'three', 'flat', 0, 1] }
+];
+const presetBox = document.getElementById('presets');
+PRESETS.forEach((p) => {
+  const b = document.createElement('button');
+  b.textContent = p.name;
+  b.addEventListener('click', () => applyPreset(p));
+  presetBox.appendChild(b);
+});
+function applyPreset(p) {
+  ['L', 'R'].forEach((side, i) => {
+    const cfg = i === 0 ? p.L : p.R;
+    const lane = LANES[side];
+    lane.state = createLaneState(cfg[0], cfg[1], cfg[2], cfg[3], cfg[4]);
+    lane.q('player').value = cfg[0];
+    lane.q('bike').value = cfg[1];
+    lane.q('road').value = cfg[2];
+    lane.wheelAngle = 0; lane.crankAngle = 0;
+    buildGearButtons(lane);
+    refreshLane(lane, true);
+  });
+  resetRun();
+  saveToUrl();
+}
+
+/* ---------- いまの条件をURLに残す（ブックマークすれば次の授業でそのまま開ける） ---------- */
+function saveToUrl() {
+  try {
+    const enc = (st) => [st.playerKey, st.bikeKey, st.roadKey, st.frontIndex, st.rearIndex].join('.');
+    history.replaceState(null, '', '#' + enc(LANES.L.state) + '_' + enc(LANES.R.state) + '_' + APP.mode);
+  } catch (e) { /* file:// などで失敗しても無視 */ }
+}
+function loadFromUrl() {
+  const h = (location.hash || '').replace(/^#/, '');
+  if (!h) return null;
+  const parts = h.split('_');
+  const dec = (x) => {
+    const a = (x || '').split('.');
+    if (!PLAYER_CONFIG[a[0]] || !BIKE_CONFIG[a[1]] || !ROAD_CONFIG[a[2]]) return null;
+    const bike = BIKE_CONFIG[a[1]];
+    return [a[0], a[1], a[2],
+      Math.max(0, Math.min(bike.fronts.length - 1, Number(a[3]) || 0)),
+      Math.max(0, Math.min(bike.rears.length - 1, Number(a[4]) || 0))];
+  };
+  const L = dec(parts[0]), R = dec(parts[1]);
+  if (!L || !R) return null;
+  return { L: L, R: R, mode: parts[2] === 'ten' ? 'ten' : 'endless' };
+}
+
+/* ---------- 起動 ---------- */
+const saved = loadFromUrl();
+if (saved) {
+  initLane('L', saved.L[0], saved.L[1], saved.L[2], saved.L[3], saved.L[4]);
+  initLane('R', saved.R[0], saved.R[1], saved.R[2], saved.R[3], saved.R[4]);
+  if (saved.mode === 'ten') setMode('ten');
+} else {
+  initLane('L', 'boy', 'single', 'flat', 0, 0);
+  initLane('R', 'boy', 'three', 'flat', 0, 1);
+}
+updateTimer();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
